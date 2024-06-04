@@ -11,14 +11,24 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  TextEditingController txtSearch = TextEditingController();
   HomeProvider? providerR;
   HomeProvider? providerW;
+  ScrollController scrollController = ScrollController();
+  WallpaperModel? model;
 
   @override
   void initState() {
     super.initState();
 
     context.read<HomeProvider>().getWallpaperData();
+
+    scrollController.addListener(() {
+      if (scrollController.position.pixels ==
+          scrollController.position.maxScrollExtent) {
+        context.read<HomeProvider>().changePage();
+      }
+    });
   }
 
   @override
@@ -31,12 +41,38 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: "search",
+                hintStyle: const TextStyle(color: Colors.grey),
+                suffixIcon: IconButton(
+                  onPressed: () {
+                    model!.hitsList!.clear();
+                    providerR!.searchImage(txtSearch.text);
+                  },
+                  icon: const Icon(Icons.search),
+
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 0,
+                  horizontal: 10,
+                ),
+              ),
+              controller: txtSearch,
+            ),
+          ),
           Expanded(
             child: FutureBuilder(
               future: providerW!.model,
               builder: (context, snapshot) {
-                WallpaperModel? model = snapshot.data;
-
+                model = snapshot.data;
+                providerW!.wallpaper.addAll(model!.hitsList!);
                 if (snapshot.hasError) {
                   return const Center(
                     child: Column(
@@ -49,13 +85,32 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 } else if (snapshot.hasData) {
                   return GridView.builder(
-                    itemCount: model!.hitsList!.length,
+                    controller: scrollController,
+                    itemCount: providerW!.wallpaper.length + 1,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                     ),
                     itemBuilder: (context, index) {
-                      return Image.network(model.hitsList![index].previewURL!);
+                      if (index < providerW!.wallpaper.length) {
+                        return Padding(
+                          padding: const EdgeInsets.all(5),
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.pushNamed(context, 'wallpaper',
+                                  arguments: model!.hitsList![index]);
+                            },
+                            child: Image.network(
+                              providerW!.wallpaper[index].previewURL!,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        );
+                      } else {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
                     },
                   );
                 }
